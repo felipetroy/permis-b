@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Permis B — Flashcards</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  .perspective-1000 { perspective: 1000px; }
+  .transform-style-3d { transform-style: preserve-3d; }
+  .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+  .rotate-y-180 { transform: rotateY(180deg); }
+</style>
+</head>
+<body class="bg-slate-50">
+<div id="app"></div>
+
+<script type="module">
+import { h, render } from 'https://esm.sh/preact@10.25.4';
+import { useState, useEffect } from 'https://esm.sh/preact@10.25.4/hooks';
+import htm from 'https://esm.sh/htm@3.1.1';
+const html = htm.bind(h);
+
+// ── Icons ─────────────────────────────────────────────────
+const ChevronLeft  = () => html`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>`;
+const ChevronRight = () => html`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`;
+const RotateCw     = () => html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>`;
+const BookOpen     = () => html`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>`;
+const Layers       = () => html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>`;
+
+// ── Data ──────────────────────────────────────────────────
+const flashcardData = [
+  { id:1,  category:"Vérifications Intérieures", question:"Mettez le rétroviseur intérieur en position \"nuit\".", answer:"Montrez le dispositif situé sous le rétroviseur intérieur et basculez-le. (Si automatique, indiquez-le simplement)." },
+  { id:2,  category:"Sécurité Routière", question:"Quel est l'intérêt de la position nuit du rétroviseur intérieur ?", answer:"Ne pas être ébloui par les feux du véhicule suiveur." },
+  { id:7,  category:"Vérifications Intérieures", question:"Vérifiez la présence du gilet de haute visibilité (gilet jaune).", answer:"Indiquez où il se trouve (ex : boîte à gants, vide-poche) sans obligation de le sortir. Il doit être à portée de main." },
+  { id:8,  category:"Sécurité Routière", question:"En cas de panne ou d'accident, quel équipement de sécurité doit être porté avant de quitter le véhicule ?", answer:"Il faut porter le gilet de haute visibilité avant de sortir du véhicule." },
+  { id:13, category:"Vérifications Intérieures", question:"Montrez le voyant d'alerte signalant un défaut de batterie.", answer:"Mettez le contact et montrez le voyant rouge représentant une batterie avec un + et un –." },
+  { id:14, category:"Sécurité Routière", question:"Qu'est-ce qui peut provoquer la décharge de la batterie, moteur éteint ?", answer:"Les feux ou les accessoires électriques laissés en fonctionnement." },
+  { id:18, category:"Vérifications Intérieures", question:"De quelle couleur est le voyant qui indique une défaillance du système de freinage ?", answer:"De couleur rouge (souvent un point d'exclamation dans un cercle ou un \"P\")." },
+  { id:19, category:"Sécurité Routière", question:"Quel est le risque de circuler avec un frein de parking mal desserré ?", answer:"Une dégradation ou une surchauffe du système de freinage." },
+  { id:21, category:"Vérifications Intérieures", question:"Montrez le voyant d'alerte de pression d'huile moteur.", answer:"Mettez le contact et montrez le voyant rouge représentant un bidon d'huile. S'il reste allumé moteur tournant, arrêtez-vous immédiatement." },
+  { id:22, category:"Sécurité Routière", question:"Quel est le risque de circuler avec un manque d'huile moteur ?", answer:"Une casse moteur irréversible pouvant survenir en quelques secondes." },
+  { id:23, category:"Vérifications Intérieures", question:"Montrez le voyant de température du liquide de refroidissement.", answer:"Mettez le contact et montrez le voyant rouge représentant un thermomètre plongé dans un liquide. Indique une surchauffe moteur." },
+  { id:24, category:"Sécurité Routière", question:"Que faire si le voyant de température moteur s'allume en conduite ?", answer:"S'arrêter dès que possible en sécurité, couper le moteur. Ne pas ouvrir le capot immédiatement (risque de brûlure). Appeler un dépanneur si nécessaire." },
+  { id:25, category:"Vérifications Intérieures", question:"Comment régler correctement l'appuie-tête ?", answer:"La partie rigide doit se situer au niveau du sommet de la tête (au moins au niveau des yeux). Il protège contre le coup du lapin en cas de choc arrière." },
+  { id:26, category:"Sécurité Routière", question:"Quel est le rôle de l'appuie-tête ?", answer:"Protéger les vertèbres cervicales en cas de choc arrière (coup du lapin)." },
+  { id:27, category:"Vérifications Intérieures", question:"Comment vérifier que la ceinture de sécurité fonctionne correctement ?", answer:"Tirez brusquement la sangle : elle doit se bloquer. Vérifiez qu'elle n'est pas vrillée ni endommagée. La sangle doit passer en diagonale sur l'épaule et le thorax (jamais sous le bras)." },
+  { id:28, category:"Sécurité Routière", question:"Quel risque présente une ceinture mal positionnée (passée sous le bras) ?", answer:"Des blessures abdominales graves en cas de choc car la sangle comprime les organes internes." },
+  { id:29, category:"Vérifications Intérieures", question:"Vérifiez la présence du triangle de présignalisation.", answer:"Indiquez où il se trouve (généralement dans le coffre). En cas de panne : 30 m en ville, 100 m sur route, 150 m sur autoroute." },
+  { id:30, category:"Vérifications Intérieures", question:"Montrez la commande d'activation des feux de détresse.", answer:"Montrez le bouton avec le triangle rouge (warning). À allumer immédiatement en cas de panne, arrêt d'urgence ou bouchon soudain." },
+  { id:4,  category:"Vérifications Extérieures", question:"Contrôlez l'état de tous les balais d'essuie-glace du véhicule.", answer:"Soulevez les essuie-glaces (avant et arrière) et vérifiez visuellement et au toucher le bon état du caoutchouc (pas de déchirure)." },
+  { id:5,  category:"Sécurité Routière", question:"Quel est le risque de circuler avec des balais d'essuie-glace défectueux ?", answer:"Une mauvaise visibilité en cas d'intempéries." },
+  { id:10, category:"Vérifications Extérieures", question:"Vérifiez l'état et la propreté des plaques d'immatriculation.", answer:"Vérifiez les plaques à l'avant et à l'arrière : elles doivent être propres, lisibles et en bon état." },
+  { id:11, category:"Sécurité Routière", question:"Quelles sont les précautions à prendre en cas d'installation d'un porte-vélo ?", answer:"La plaque d'immatriculation et les feux arrière doivent toujours rester visibles." },
+  { id:15, category:"Vérifications Extérieures", question:"Contrôlez l'état du flanc sur l'un des pneumatiques.", answer:"Vérifiez qu'il n'y a pas de déchirure, de hernie ou de coupure apparente sur le côté du pneu." },
+  { id:16, category:"Sécurité Routière", question:"À quelle fréquence est-il préconisé de vérifier la pression des pneus ?", answer:"Chaque mois pour une utilisation normale, et avant chaque long trajet." },
+  { id:31, category:"Vérifications Extérieures", question:"Comment vérifier la pression des pneumatiques ?", answer:"À froid (arrêté depuis plus de 2h ou moins de 2 km parcourus). Utiliser un manomètre. La pression préconisée est indiquée sur le montant de porte conducteur, la trappe à carburant ou dans le carnet d'entretien." },
+  { id:32, category:"Sécurité Routière", question:"Quels sont les risques liés à un sous-gonflage des pneus ?", answer:"Augmentation de la consommation, usure prématurée, risque d'éclatement à grande vitesse, perte d'adhérence et allongement de la distance de freinage." },
+  { id:33, category:"Vérifications Extérieures", question:"Comment vérifier l'usure des pneumatiques ?", answer:"Repérer les témoins d'usure (marqués TW dans les rainures). Le minimum légal est 1,6 mm. Si la sculpture est au niveau du témoin, le pneu doit être changé." },
+  { id:34, category:"Sécurité Routière", question:"Qu'est-ce qu'une hernie sur un pneu et que faut-il faire ?", answer:"Une bosse sur le flanc indiquant une structure interne endommagée. Risque d'éclatement imminent : ne pas rouler, changer le pneu immédiatement." },
+  { id:35, category:"Vérifications Extérieures", question:"Vérifiez le niveau d'huile moteur.", answer:"Moteur froid ou tiède, sur sol plat. Sortir la jauge, essuyer, réintroduire à fond, ressortir. Le niveau doit être entre MIN et MAX." },
+  { id:36, category:"Vérifications Extérieures", question:"Vérifiez le niveau du liquide de refroidissement.", answer:"Moteur FROID obligatoirement. Vérifier sur le vase d'expansion translucide que le niveau est entre MIN et MAX. Ne jamais ouvrir le bouchon moteur chaud." },
+  { id:37, category:"Vérifications Extérieures", question:"Vérifiez le niveau du liquide de frein.", answer:"Vérifier visuellement sur le bocal translucide dans le compartiment moteur. Niveau entre MIN et MAX. Un niveau bas peut indiquer une usure des plaquettes ou une fuite." },
+  { id:38, category:"Vérifications Extérieures", question:"Vérifiez le niveau du liquide lave-glace.", answer:"Repérer le réservoir avec le symbole essuie-glace. Utiliser un produit antigel homologué en hiver (jamais uniquement de l'eau)." },
+  { id:39, category:"Vérifications Extérieures", question:"Vérifiez le bon fonctionnement des feux de stop.", answer:"Faire observer l'arrière par quelqu'un pendant que vous appuyez sur la pédale de frein, ou utiliser la réflexion sur un mur. Les deux feux doivent s'allumer." },
+  { id:40, category:"Sécurité Routière", question:"Quel est le risque de circuler avec un feu de stop défectueux ?", answer:"Le conducteur suiveur n'est pas prévenu du freinage, ce qui augmente fortement le risque de collision arrière." },
+  { id:55, category:"Vérifications Extérieures", question:"Vérifiez le bon fonctionnement des feux de position avant et arrière.", answer:"Tournez la bague des feux sur la première position (veilleuses). Les feux avant (blancs ou orangés) et arrière (rouges) doivent s'allumer des deux côtés. Faire observer par un tiers ou utiliser la réflexion sur un mur." },
+  { id:56, category:"Sécurité Routière", question:"Dans quels cas doit-on se mettre en feux de position uniquement ?", answer:"À l'arrêt ou en stationnement sur une route éclairée. En circulation, on utilise toujours au minimum les feux de croisement. Les feux de position seuls ne sont pas suffisants pour rouler." },
+  { id:57, category:"Vérifications Extérieures", question:"Vérifiez le bon fonctionnement des feux de croisement.", answer:"Tournez la bague sur le symbole phares (feux de croisement). Les deux projecteurs avant s'allument avec un faisceau coupé en haut pour ne pas éblouir. Les feux arrière s'allument également. Faire observer par un tiers." },
+  { id:58, category:"Sécurité Routière", question:"Quelle est la différence entre feux de croisement et feux de route ?", answer:"Les feux de croisement ont un faisceau coupé en haut (ne pas éblouir — portée ~40 m). Les feux de route (plein phare) ont un faisceau non coupé et portent plus loin (~100 m), mais éblouissent les autres conducteurs." },
+  { id:59, category:"Vérifications Extérieures", question:"Vérifiez le bon fonctionnement des feux de route (plein phare).", answer:"Feux de croisement allumés, pousser le commodo vers l'avant (ou tirer selon le véhicule). Le voyant bleu s'allume au tableau de bord. Faire observer par un tiers que le faisceau est non coupé." },
+  { id:60, category:"Sécurité Routière", question:"Dans quels cas doit-on utiliser les feux de route ?", answer:"La nuit sur route non éclairée, sans véhicule en sens inverse ni devant soi à moins de 300 m. On les passe en feux de croisement dès qu'un véhicule arrive en sens inverse ou qu'on en rattrape un." },
+  { id:61, category:"Vérifications Extérieures", question:"Vérifiez le bon fonctionnement des clignotants.", answer:"Actionner le commodo à droite puis à gauche. Vérifier l'allumage des feux clignotants à l'avant, sur les côtés et à l'arrière. Le voyant clignote au tableau de bord. Les deux côtés doivent fonctionner." },
+  { id:62, category:"Sécurité Routière", question:"Un clignotant en panne peut-il être sanctionné ?", answer:"Oui. Un clignotant défectueux est une infraction au Code de la route. Le non-signalement d'un changement de direction ou de file est également sanctionné (amende et points retirés)." },
+  { id:63, category:"Vérifications Extérieures", question:"Vérifiez le bon fonctionnement du klaxon.", answer:"Appuyer sur la partie centrale du volant. Un son clair et audible doit être émis. Le klaxon est un équipement obligatoire — son absence ou son dysfonctionnement est une infraction." },
+  { id:64, category:"Sécurité Routière", question:"Dans quels cas est-il interdit d'utiliser le klaxon ?", answer:"En agglomération, le klaxon est interdit sauf en cas de danger immédiat. Il est interdit à proximité des hôpitaux, des établissements scolaires et la nuit en ville. Hors agglomération, il peut être utilisé pour signaler un dépassement." },
+  { id:65, category:"Vérifications Intérieures", question:"Comment régler correctement le siège conducteur avant de partir ?", answer:"Reculer le siège puis avancer jusqu'à pouvoir appuyer à fond sur la pédale d'embrayage avec la jambe légèrement fléchie. Les mains sur le volant à 9h-15h, les bras légèrement fléchis. Régler la hauteur et le dossier si possible." },
+  { id:66, category:"Sécurité Routière", question:"Pourquoi est-il important de bien régler son siège avant de conduire ?", answer:"Un mauvais réglage réduit le contrôle du véhicule, fatigue davantage le conducteur, diminue la réactivité aux pédales et peut rendre la ceinture moins efficace en cas de choc." },
+  { id:67, category:"Vérifications Intérieures", question:"Comment régler les rétroviseurs extérieurs ?", answer:"Depuis la position de conduite. Rétroviseur gauche : 1/4 de carrosserie visible sur le bord gauche, horizon au centre. Rétroviseur droit : idem côté droit, légèrement plus orienté vers la chaussée. Ne jamais régler en conduisant." },
+  { id:68, category:"Sécurité Routière", question:"Qu'est-ce que l'angle mort et comment le gérer ?", answer:"Zone non visible dans les rétroviseurs, située à l'arrière des côtés du véhicule. Se vérifier en tournant la tête avant tout changement de direction, dépassement, ou insertion dans la circulation. Ne jamais se fier uniquement aux rétroviseurs." },
+  { id:41, category:"Sécurité Routière", question:"Quelles sont les vitesses maximales autorisées en France ?", answer:"Zone de rencontre : 20 km/h. Agglomération : 50 km/h. Hors agglo (sans séparateur) : 80 km/h. Route 2×2 voies : 110 km/h. Autoroute (sec) : 130 km/h, (pluie) : 110 km/h. Brouillard < 50 m : 50 km/h partout." },
+  { id:42, category:"Sécurité Routière", question:"Quelle est la règle des 2 secondes pour les distances de sécurité ?", answer:"Choisir un repère fixe. Quand le véhicule devant le dépasse, compter « un et deux ». Si on arrive avant : trop près. Environ 28 m à 50 km/h, 50 m à 90 km/h, 73 m à 130 km/h. Doubler par pluie ou verglas." },
+  { id:43, category:"Sécurité Routière", question:"Quel est le taux d'alcoolémie légal au volant ?", answer:"0,5 g/L dans le sang pour les conducteurs habituels. 0,2 g/L pour les conducteurs en période probatoire (3 premières années). Délit pénal dès 0,8 g/L." },
+  { id:44, category:"Sécurité Routière", question:"L'usage du téléphone au volant est-il autorisé avec un kit mains-libres ?", answer:"Seul le kit mains-libres intégré au véhicule est toléré. Tenir le téléphone à la main est interdit même à l'arrêt moteur tournant. Sanction : 135 € et 3 points retirés." },
+  { id:45, category:"Sécurité Routière", question:"Que faire en cas de panne sur autoroute ?", answer:"1. Feux de détresse. 2. Se rabattre sur la BAU. 3. Gilet AVANT de sortir. 4. Sortir par la droite, s'éloigner derrière la glissière. 5. Triangle à 150 m. 6. Appeler depuis borne d'urgence ou le 112." },
+  { id:46, category:"Sécurité Routière", question:"Que faire en cas de crevaison à grande vitesse ?", answer:"Ne pas freiner brusquement. Tenir fermement le volant à deux mains. Relâcher progressivement l'accélérateur. Laisser décélérer naturellement. S'arrêter hors chaussée. Puis : gilet et triangle." },
+  { id:47, category:"Sécurité Routière", question:"Qu'est-ce que l'aquaplaning et comment réagir ?", answer:"Perte de contact entre les pneus et la chaussée due à une couche d'eau. Ne pas freiner brusquement, relâcher l'accélérateur, tenir le volant, laisser décélérer jusqu'au retour du contact." },
+  { id:48, category:"Sécurité Routière", question:"Quand doit-on allumer les feux de croisement ?", answer:"De nuit, dans les tunnels (même de jour), par mauvaise visibilité, en agglomération éclairée pour être vu. Jamais de pleins phares face à un véhicule en sens inverse." },
+  { id:49, category:"Sécurité Routière", question:"Dans quels cas utiliser les feux antibrouillard arrière ?", answer:"Uniquement lorsque la visibilité est inférieure à 50 m. Les éteindre dès que la visibilité s'améliore. Leur usage injustifié est sanctionné." },
+  { id:50, category:"Sécurité Routière", question:"Quand s'applique la priorité à droite ?", answer:"Sur toutes les routes sans signalisation de priorité. Ne s'applique pas sur les routes prioritaires ni en présence de stop ou cédez-le-passage. Dans les giratoires, les véhicules déjà engagés sont prioritaires." },
+  { id:3,  category:"Premiers Secours", question:"Comment vérifier la respiration d'une victime ?", answer:"Regarder si le ventre et la poitrine se soulèvent et sentir l'air à l'expiration." },
+  { id:6,  category:"Premiers Secours", question:"Comment arrêter une hémorragie ?", answer:"En appuyant fortement sur l'endroit qui saigne avec les doigts ou la paume de la main en maintenant un tissu propre sur la plaie." },
+  { id:9,  category:"Premiers Secours", question:"Quels sont les numéros d'urgence à composer en France ?", answer:"Le 15 (SAMU), le 18 (sapeurs-pompiers), le 17 (police/gendarmerie) et le 112 (numéro européen, valide dans toute l'UE, même sans carte SIM)." },
+  { id:12, category:"Premiers Secours", question:"Qu'est-ce qu'une perte de connaissance ?", answer:"C'est lorsque la victime ne répond pas et ne réagit pas, mais respire." },
+  { id:17, category:"Premiers Secours", question:"Quels comportements adopter en présence d'une victime inconsciente qui respire ?", answer:"La placer en Position Latérale de Sécurité (PLS), alerter les secours (15, 18 ou 112) et surveiller sa respiration jusqu'à leur arrivée." },
+  { id:20, category:"Premiers Secours", question:"Comment et pourquoi protéger une zone de danger en cas d'accident de la route ?", answer:"En délimitant clairement et largement la zone de danger de façon visible (triangle, feux de détresse) pour protéger les victimes et éviter un sur-accident." },
+  { id:51, category:"Premiers Secours", question:"Que faire si une victime ne respire pas après vérification ?", answer:"Commencer immédiatement le massage cardiaque externe (MCE) : 30 compressions thoraciques fortes et rapides, puis 2 insufflations. Continuer jusqu'à l'arrivée des secours. Appeler le 15 ou 112 en parallèle." },
+  { id:52, category:"Premiers Secours", question:"Comment réaliser la Position Latérale de Sécurité (PLS) ?", answer:"1. Bras proche à angle droit. 2. Amener l'autre main contre la joue. 3. Tirer le genou éloigné pour faire basculer la victime sur le côté. 4. Tête légèrement en arrière, bouche vers le bas pour libérer les voies aériennes." },
+  { id:53, category:"Premiers Secours", question:"Que faire face à une victime coincée dans un véhicule accidenté ?", answer:"Ne pas la déplacer. Couper le moteur. Alerter les secours (15, 18, 112). Parler à la victime pour la rassurer. Protéger la zone de danger." },
+  { id:54, category:"Premiers Secours", question:"Comment réagir face à une personne victime d'un malaise au volant (en tant que passager) ?", answer:"Maintenir le volant en ligne droite, aider à ralentir (frein à main progressivement), allumer les feux de détresse, s'arrêter en sécurité dès que possible et appeler le 15." },
+
+  // ── Vérifications Intérieures manquantes ──────────────────
+  { id:69,  category:"Vérifications Intérieures", question:"Montrez la commande de réglage de la hauteur des feux et expliquez quand l'utiliser.", answer:"La molette se trouve sur le tableau de bord, souvent à gauche du volant. Position 0 = véhicule vide. On augmente le chiffre (1, 2, 3…) quand le véhicule est chargé à l'arrière, pour éviter d'éblouir les autres usagers." },
+  { id:70,  category:"Vérifications Intérieures", question:"Faites fonctionner les essuie-glaces avant et montrez les différentes vitesses.", answer:"Commande sur la manette droite du volant. Positions : intermittent → vitesse lente → vitesse rapide. Une impulsion vers soi = balayage unique. Actionnez le lave-glace en poussant la manette vers l'avant." },
+  { id:71,  category:"Vérifications Intérieures", question:"Montrez où se trouve le certificat d'immatriculation (carte grise).", answer:"Doit être à bord du véhicule (souvent boîte à gants). Il identifie le véhicule et son propriétaire. Document obligatoire à présenter en cas de contrôle, avec le permis et l'attestation d'assurance." },
+  { id:72,  category:"Vérifications Intérieures", question:"Montrez l'indicateur de niveau de carburant et expliquez comment le lire.", answer:"Sur le tableau de bord : aiguille entre F (full/plein) et E (empty/vide). Un voyant orange s'allume quand la réserve est atteinte (~50 km restants). La petite flèche à côté du symbole indique le côté de la trappe à carburant." },
+  { id:73,  category:"Vérifications Intérieures", question:"Actionnez le dégivrage de la lunette arrière et montrez le voyant correspondant.", answer:"Bouton sur le tableau de bord : pictogramme d'un rectangle avec des lignes horizontales. Voyant orange s'allume. Les fils résistifs chauffent la lunette pour éliminer givre ou buée. Se désactive automatiquement après quelques minutes." },
+  { id:74,  category:"Vérifications Intérieures", question:"Montrez où se trouve l'éthylotest.", answer:"À bord du véhicule (ex : boîte à gants). Permet de vérifier son alcoolémie avant de conduire. Seuil légal : 0,5 g/l de sang (0,2 g/l pour permis probatoire). Peut être chimique (usage unique) ou électronique." },
+  { id:75,  category:"Vérifications Intérieures", question:"Montrez la commande de réglage du volant et expliquez comment bien le régler.", answer:"Levier sous la colonne de direction : on déverrouille, on ajuste hauteur et profondeur. Bon réglage : bras légèrement fléchis en position 9h15, poignets pouvant reposer sur le haut du volant bras tendus. Reverrouiller ensuite." },
+  { id:76,  category:"Vérifications Intérieures", question:"Montrez comment diriger l'air vers le pare-brise pour désembuer.", answer:"Bouton représentant un pare-brise avec des flèches montantes. Activer le chauffage ou la climatisation avec air vers le pare-brise. Désactiver le recyclage d'air (l'air extérieur doit entrer pour évacuer l'humidité)." },
+  { id:77,  category:"Vérifications Intérieures", question:"Identifiez le voyant de mauvaise fermeture de portière.", answer:"Voyant rouge : pictogramme du véhicule vu de dessus avec une portière ouverte. S'allume si une portière, le coffre ou le capot est mal fermé. Ne jamais rouler avec ce voyant allumé : risque d'ouverture en mouvement." },
+  { id:78,  category:"Vérifications Intérieures", question:"Montrez la commande du régulateur de vitesse et expliquez son fonctionnement.", answer:"Boutons au volant ou manette dédiée. Activer ON → atteindre la vitesse souhaitée → appuyer SET. Le véhicule maintient la vitesse sans accélérateur. Augmenter (+) / diminuer (-). Freiner ou appuyer OFF annule le régulateur." },
+  { id:79,  category:"Vérifications Intérieures", question:"Montrez la commande de désactivation de l'airbag passager.", answer:"Souvent sur la tranche du tableau de bord côté passager (accès portière ouverte) ou dans la boîte à gants. On utilise la clé pour basculer sur OFF. Obligatoire quand un siège enfant dos à la route est installé à l'avant. Un voyant confirme la désactivation." },
+  { id:80,  category:"Vérifications Intérieures", question:"Identifiez le voyant d'absence de ceinture de sécurité.", answer:"Voyant rouge : personnage avec une ceinture en diagonale, accompagné d'un bip. S'allume quand le conducteur ou un passager n'est pas attaché. La ceinture est obligatoire pour tous les occupants. Amende : 135 € et 3 points retirés." },
+  { id:81,  category:"Vérifications Intérieures", question:"Montrez l'attestation d'assurance et où doit-elle être apposée ?", answer:"Le papillon vert doit être collé sur le pare-brise, en bas à droite côté passager. Preuve de l'assurance au minimum responsabilité civile. Le certificat d'assurance (carte verte) doit aussi être à bord. Conduire sans assurance : délit, 3 750 € d'amende." },
+  { id:82,  category:"Vérifications Intérieures", question:"Allumez les feux de brouillard arrière et montrez le voyant correspondant.", answer:"Feux de croisement obligatoirement allumés d'abord. Tourner la bague ou appuyer sur le bouton dédié (pictogramme phare + traits horizontaux). Le voyant au tableau de bord est orange. À n'utiliser qu'en cas de brouillard ou neige dense (visibilité < 50 m)." },
+  { id:83,  category:"Vérifications Intérieures", question:"De quelle couleur est le voyant de feu de brouillard arrière ?", answer:"Orange (ambre). Pictogramme : phare avec des traits horizontaux barrés d'une ligne ondulée, orienté vers la droite. À ne pas confondre avec le voyant de brouillard avant (vert, même symbole mais vers la gauche). Utilisation injustifiée = infraction sanctionnée." },
+  { id:84,  category:"Vérifications Intérieures", question:"Montrez la commande de recyclage de l'air et expliquez quand l'utiliser.", answer:"Bouton avec un pictogramme de voiture et une flèche en boucle. Permet de recycler l'air intérieur sans faire entrer l'air extérieur. Utile en tunnel, en cas d'odeurs ou de pollution. À ne pas maintenir trop longtemps : l'air s'enrichit en CO2 et crée de la buée." },
+  { id:85,  category:"Vérifications Intérieures", question:"Montrez où se trouve le constat amiable.", answer:"À bord du véhicule (boîte à gants). Document à remplir sur place en cas d'accident matériel avec un autre conducteur. Recto commun (circonstances, croquis), verso individuel. Signé par les deux parties : chacun conserve son exemplaire. Transmettre à son assurance sous 5 jours ouvrés." },
+  { id:86,  category:"Vérifications Intérieures", question:"Montrez la commande du limiteur de vitesse et expliquez la différence avec le régulateur.", answer:"Même manette que le régulateur, sélectionner le mode LIM. On règle un plafond de vitesse max mais on continue d'accélérer soi-même. Le véhicule ne dépasse pas la limite. Différence : le régulateur maintient une vitesse constante automatiquement ; le limiteur est juste un plafond. Peut être contourné en forçant sur l'accélérateur (kick-down)." },
+  { id:87,  category:"Vérifications Intérieures", question:"Faites fonctionner l'essuie-glace arrière.", answer:"Généralement en tournant l'embout de la manette droite du volant, ou en la poussant vers l'avant. Le pictogramme représente une vitre arrière avec un balai. S'active parfois automatiquement en marche arrière si les essuie-glaces avant fonctionnent." },
+  { id:88,  category:"Vérifications Intérieures", question:"Montrez où se trouvent les fixations Isofix.", answer:"Anneaux métalliques entre l'assise et le dossier de la banquette arrière, souvent marqués ISOFIX avec des caches plastique. Permettent d'ancrer un siège enfant de manière standardisée et sécurisée (2 points inférieurs + top tether ou jambe de force). Réduit le risque de mauvaise installation." },
+  { id:89,  category:"Vérifications Intérieures", question:"Identifiez le voyant de baisse de pression des pneumatiques (TPMS).", answer:"Voyant orange : pictogramme d'un pneu vu de face avec un point d'exclamation. S'allume si la pression d'un ou plusieurs pneus est insuffisante (~25% en dessous de la valeur recommandée). S'arrêter dès que possible et vérifier la pression de tous les pneus." },
+
+  // ── Vérifications Extérieures manquantes ──────────────────
+  { id:90,  category:"Vérifications Extérieures", question:"Contrôlez le fonctionnement des feux de brouillard arrière depuis l'extérieur.", answer:"Feux de croisement allumés d'abord. Depuis l'arrière, vérifiez que le feu de brouillard (rouge intense, côté gauche ou centre) s'allume. Vérifiez état du cabochon (non cassé), propreté, ampoule fonctionnelle." },
+  { id:91,  category:"Vérifications Extérieures", question:"Contrôlez l'état et le fonctionnement des feux de détresse depuis l'extérieur.", answer:"Actionnez le warning à l'intérieur (triangle rouge). Faites le tour du véhicule : tous les clignotants (avant, arrière, latéraux) doivent clignoter simultanément et synchronisés. Vérifiez l'état des cabochons et leur propreté." },
+  { id:92,  category:"Vérifications Extérieures", question:"Montrez l'emplacement de la batterie du véhicule.", answer:"Sous le capot, généralement côté gauche ou droit du compartiment moteur. Forme rectangulaire, borne + (cache rouge) et borne – (noire). Sur certains véhicules : dans le coffre ou sous la banquette arrière. En cas de branchement câbles de démarrage : + panne → + secours → – secours → masse véhicule en panne." },
+  { id:93,  category:"Vérifications Extérieures", question:"Vérifiez l'état des dispositifs réfléchissants (catadioptres).", answer:"Catadioptres à l'arrière (rouge), côtés (orange), avant (blanc). Vérifiez leur présence, propreté, absence de cassure. Dispositifs passifs obligatoires permettant au véhicule d'être visible même en cas de panne des feux." },
+  { id:94,  category:"Vérifications Extérieures", question:"Ouvrez la trappe à carburant, montrez le bouchon et indiquez le type de carburant.", answer:"La trappe s'ouvre via un bouton/levier dans l'habitacle ou en appuyant directement dessus. Le type de carburant est indiqué sur l'étiquette intérieure de la trappe ou sur le bouchon (ex : Essence E10, Diesel B7). La flèche au tableau de bord indique le côté de la trappe." },
+  { id:95,  category:"Vérifications Extérieures", question:"Montrez où se fait le remplissage d'huile moteur.", answer:"Sous le capot : bouchon sur le dessus du moteur, marqué d'un pictogramme de burette d'huile, souvent jaune ou noir. Pour l'appoint : dévisser le bouchon, ajouter l'huile préconisée (type et viscosité dans le carnet d'entretien). Vérifier avec la jauge : niveau entre MIN et MAX." },
+  { id:96,  category:"Vérifications Extérieures", question:"Où peut-on trouver la pression préconisée des pneumatiques ?", answer:"Sur une étiquette collée à l'intérieur du montant de la portière conducteur, à l'intérieur de la trappe à carburant, ou dans le carnet d'entretien. Les valeurs sont en bar, différenciées avant/arrière et selon la charge. Vérification à froid obligatoire (véhicule à l'arrêt depuis plus de 2h ou moins de 3 km parcourus)." },
+  { id:97,  category:"Vérifications Extérieures", question:"Vérifiez le fonctionnement de l'éclairage de la plaque d'immatriculation arrière.", answer:"Feux de position ou croisement allumés. Depuis l'arrière, vérifiez que la plaque est bien éclairée par une lumière blanche. Cabochon propre, non cassé, ampoule fonctionnelle. Obligatoire la nuit. Un défaut est un motif de contre-visite au contrôle technique." },
+  { id:98,  category:"Vérifications Extérieures", question:"Montrez le dispositif de verrouillage enfant sur les portières arrière.", answer:"Sur la tranche intérieure des portières arrière (visible portière ouverte) : petit levier ou bouton. Une fois activé, la portière ne peut plus s'ouvrir de l'intérieur — uniquement de l'extérieur. Empêche les enfants d'ouvrir la portière pendant la conduite." },
+  { id:99,  category:"Vérifications Extérieures", question:"Contrôlez le fonctionnement des feux de recul.", answer:"Enclencher la marche arrière (contact mis). Depuis l'arrière du véhicule : vérifier que le ou les feux blancs de recul s'allument. Vérifier état du cabochon (non cassé), propreté, ampoule fonctionnelle. Avertissent les autres usagers de votre intention de reculer." },
+  { id:100, category:"Vérifications Extérieures", question:"Ouvrez le capot, vérifiez son maintien, puis refermez-le et vérifiez sa bonne fermeture.", answer:"1. Tirer la commande d'ouverture dans l'habitacle. 2. À l'extérieur, actionner le loquet de sécurité sous le capot. 3. Soulever et maintenir avec la béquille (si pas à vérins). 4. Pour fermer : retirer la béquille, abaisser le capot à ~20 cm puis lâcher. 5. Vérifier en essayant de soulever légèrement. Le voyant portière ne doit pas s'allumer." },
+  { id:101, category:"Vérifications Extérieures", question:"Vérifiez le fonctionnement des feux diurnes (DRL — Daytime Running Lights).", answer:"S'allument automatiquement au contact, sans actionner la commande des feux. Depuis l'avant : feux blancs LED qui s'éteignent ou se réduisent lorsqu'on allume les feux de croisement. N'éclairent pas l'arrière et ne remplacent pas les feux de croisement la nuit." },
+  { id:102, category:"Vérifications Extérieures", question:"Montrez l'emplacement où l'on peut changer une ampoule à l'avant.", answer:"Sous le capot, à l'arrière du bloc optique avant. Chaque phare contient ampoule de croisement, de route, de clignotant, de position. On accède par l'arrière, on tourne le cache d'1/4 de tour, on débranche et on remplace. Ne jamais toucher une ampoule halogène à la main. Sur véhicule LED : remplacement en atelier uniquement." },
+  { id:103, category:"Vérifications Extérieures", question:"Montrez l'emplacement où l'on peut changer une ampoule à l'arrière.", answer:"Depuis l'intérieur du coffre : retirer le cache de garniture au niveau du feu arrière. Le porte-ampoule se retire d'1/4 de tour. Le bloc contient : stop, position, clignotant, recul, et parfois brouillard arrière. Remplacer par une ampoule de même type et puissance. Certains feux se démontent de l'extérieur avec des vis." },
+  { id:104, category:"Vérifications Extérieures", question:"Ouvrez le coffre, vérifiez son ouverture, puis refermez-le et vérifiez sa bonne fermeture.", answer:"S'ouvre via télécommande, bouton tableau de bord ou bouton hayon. Vérins maintiennent le coffre ouvert. Pour refermer : abaisser le hayon jusqu'au clic de verrouillage. Tirer légèrement pour vérifier. Le voyant de fermeture ne doit pas s'allumer. Un coffre mal fermé peut s'ouvrir à grande vitesse." },
+  { id:105, category:"Vérifications Extérieures", question:"Montrez l'emplacement des gicleurs de lave-glace avant.", answer:"Sur le capot (petites buses) ou intégrés aux balais. Projettent le liquide lave-glace sur le pare-brise (en tirant la manette vers soi). Vérifier qu'ils ne sont pas bouchés et que les jets sont bien orientés. Se débouchent avec une aiguille fine. Un mauvais fonctionnement est un motif de contre-visite au contrôle technique." },
+
+  // ── Premiers Secours manquants ────────────────────────────
+  { id:106, category:"Premiers Secours", question:"Qu'est-ce que le système SAIP et comment réagir à une alerte ?", answer:"SAIP = Système d'Alerte et d'Information des Populations. Activé en cas de danger grave (attentat, catastrophe, accident industriel). Signal : sirènes (son montant/descendant, 3 cycles) + app FR-Alert. Consignes : se mettre à l'abri dans un bâtiment en dur, fermer portes et fenêtres, couper ventilation, ne pas aller chercher ses enfants, écouter la radio officielle, ne pas téléphoner." },
+  { id:107, category:"Premiers Secours", question:"Quels comportements adopter face à une attaque terroriste ou un attentat ?", answer:"3 réflexes — S'ÉCHAPPER : fuir sans ses affaires, en zigzag, en emmenant le maximum de personnes. SE CACHER : s'enfermer, éteindre les lumières, couper le son du téléphone, s'allonger, barricader. ALERTER : appeler le 17 (police) ou le 15 (SAMU) en chuchotant, ou envoyer un SMS au 114. Ne pas filmer, ne pas revenir en arrière, ne pas utiliser l'ascenseur." },
+  { id:108, category:"Premiers Secours", question:"À quoi sert un défibrillateur automatisé externe (DAE) et comment l'utiliser ?", answer:"Sert à délivrer un choc électrique pour relancer un cœur en arrêt cardiaque. Utilisation : 1. Allumer → suivre les instructions vocales. 2. Coller les deux électrodes sur la poitrine nue (une sous la clavicule droite, l'autre sous l'aisselle gauche). 3. Ne pas toucher la victime pendant l'analyse. 4. Si choc recommandé : s'écarter et appuyer sur le bouton. 5. Reprendre immédiatement le MCE après le choc. Tout le monde peut l'utiliser sans formation." },
+  { id:109, category:"Premiers Secours", question:"Comment réagir face à une victime qui présente une brûlure ?", answer:"1. Supprimer la cause (éloigner, éteindre les flammes). 2. Refroidir en faisant couler de l'eau tempérée (15-25°C) pendant au moins 10 minutes. 3. Retirer les vêtements s'ils ne collent pas. 4. Ne jamais appliquer pommade, beurre, glace ou coton. 5. Appeler le 15 si la brûlure est étendue (> paume de la victime), profonde, ou touche le visage/mains/articulations/voies respiratoires." },
+  { id:110, category:"Premiers Secours", question:"Comment réagir face à une personne qui s'étouffe (obstruction totale des voies aériennes) ?", answer:"Si la victime ne peut plus parler, tousser ni respirer : 1. Jusqu'à 5 claques vigoureuses dans le dos (entre les omoplates, victime penchée en avant). 2. Si inefficace : 5 compressions abdominales (Heimlich) — poing au-dessus du nombril, compressions vers soi et vers le haut. 3. Alterner 5 claques / 5 compressions jusqu'à désobstruction. 4. Si la victime perd connaissance : allonger, appeler le 15, commencer la RCP." },
+];
+
+// ── App ───────────────────────────────────────────────────
+function App() {
+  const [cards, setCards] = useState(flashcardData);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [filter, setFilter] = useState("All");
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
+
+  const categories = ["All", ...new Set(flashcardData.map(c => c.category))];
+
+  useEffect(() => {
+    setCards(filter === "All" ? flashcardData : flashcardData.filter(c => c.category === filter));
+    setCurrentIndex(0);
+    setIsFlipped(false);
+  }, [filter]);
+
+  const handleNext = () => {
+    setIsFlipped(false);
+    setTimeout(() => setCurrentIndex(p => (p + 1) % cards.length), 150);
+  };
+  const handlePrev = () => {
+    setIsFlipped(false);
+    setTimeout(() => setCurrentIndex(p => (p - 1 + cards.length) % cards.length), 150);
+  };
+  const handleFlip = () => setIsFlipped(!isFlipped);
+
+  const minSwipe = 50;
+  const onTouchStart = (e) => { setTouchEnd(null); setTouchStart(e.targetTouches[0].clientX); };
+  const onTouchMove  = (e) => setTouchEnd(e.targetTouches[0].clientX);
+  const onTouchEnd   = () => {
+    if (!touchStart || !touchEnd) return;
+    const d = touchStart - touchEnd;
+    if (d > minSwipe) handleNext();
+    else if (d < -minSwipe) handlePrev();
+  };
+
+  if (!cards.length) return null;
+  const card = cards[currentIndex];
+
+  const catColor = (cat) => ({
+    "Vérifications Intérieures": "bg-blue-100 text-blue-800",
+    "Vérifications Extérieures": "bg-emerald-100 text-emerald-800",
+    "Sécurité Routière":         "bg-amber-100 text-amber-800",
+    "Premiers Secours":          "bg-red-100 text-red-800",
+  }[cat] || "bg-gray-100 text-gray-800");
+
+  return html`
+    <div class="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800">
+
+      <header class="bg-white px-4 py-4 shadow-sm z-10 sticky top-0">
+        <div class="max-w-md mx-auto flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="p-2 bg-indigo-600 rounded-lg text-white"><${BookOpen} /></div>
+            <h1 class="font-bold text-lg">Permis B — Vérifs</h1>
+          </div>
+          <span class="text-sm font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
+            ${currentIndex + 1} / ${cards.length}
+          </span>
+        </div>
+      </header>
+
+      <main class="flex-1 flex flex-col items-center justify-center p-4 max-w-md mx-auto w-full">
+
+        <div class="w-full mb-6 overflow-x-auto pb-2 scrollbar-hide">
+          <div class="flex gap-2">
+            ${categories.map(cat => html`
+              <button
+                key=${cat}
+                onClick=${() => setFilter(cat)}
+                class=${`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  filter === cat
+                    ? "bg-indigo-600 text-white shadow-md"
+                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                ${cat === "All" ? "Toutes les questions" : cat}
+              </button>
+            `)}
+          </div>
+        </div>
+
+        <div
+          class="relative w-full aspect-[4/5] sm:aspect-[3/4] cursor-pointer perspective-1000"
+          onClick=${handleFlip}
+          onTouchStart=${onTouchStart}
+          onTouchMove=${onTouchMove}
+          onTouchEnd=${onTouchEnd}
+        >
+          <div class=${`w-full h-full transition-transform duration-500 transform-style-3d relative ${isFlipped ? "rotate-y-180" : ""}`}>
+
+            <div class="absolute inset-0 w-full h-full bg-white rounded-3xl shadow-xl border border-slate-100 p-8 flex flex-col items-center justify-center backface-hidden">
+              <div class=${`absolute top-6 px-4 py-1.5 rounded-full text-xs font-bold tracking-wide uppercase ${catColor(card.category)}`}>
+                ${card.category}
+              </div>
+              <p class="text-xl font-bold text-center leading-snug mt-4 text-slate-800">
+                ${card.question}
+              </p>
+              <div class="absolute bottom-6 flex items-center gap-2 text-slate-400 text-sm font-medium">
+                <${RotateCw} />
+                <span>Appuyer pour voir la réponse</span>
+              </div>
+            </div>
+
+            <div class="absolute inset-0 w-full h-full bg-indigo-600 text-white rounded-3xl shadow-xl p-8 flex flex-col items-center justify-center backface-hidden rotate-y-180">
+              <div class="absolute top-6 px-4 py-1.5 rounded-full text-xs font-bold tracking-wide uppercase bg-indigo-500 text-indigo-50">
+                Réponse
+              </div>
+              <p class="text-lg font-medium text-center leading-relaxed mt-6 overflow-y-auto max-h-full">
+                ${card.answer}
+              </p>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="w-full flex items-center justify-between mt-6 gap-4">
+          <button onClick=${handlePrev} class="flex-1 bg-white border border-slate-200 py-4 rounded-2xl flex items-center justify-center text-slate-700 active:bg-slate-50 shadow-sm">
+            <${ChevronLeft} />
+          </button>
+          <button onClick=${handleNext} class="flex-1 bg-white border border-slate-200 py-4 rounded-2xl flex items-center justify-center text-slate-700 active:bg-slate-50 shadow-sm">
+            <${ChevronRight} />
+          </button>
+        </div>
+
+        <p class="mt-5 text-xs text-slate-400 text-center flex items-center justify-center gap-1">
+          <${Layers} /> Swipe gauche / droite pour changer de carte
+        </p>
+
+      </main>
+    </div>
+  `;
+}
+
+render(html`<${App} />`, document.getElementById('app'));
+</script>
+</body>
+</html>
